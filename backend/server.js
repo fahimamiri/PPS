@@ -27,6 +27,10 @@ app.get("/", (request, response) => {
 });
 
 // Route for /contact
+app.set('views', path.join(__dirname, 'views'));
+app.set('view engine', 'ejs');
+
+
 
 
 // Middleware to handle 404 errors
