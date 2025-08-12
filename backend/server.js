@@ -1,54 +1,63 @@
 const createError = require("http-errors");
 const express = require("express");
-
-const livereload = require("livereload");
 const path = require("path");
-
-const requestTime = require("./middleware/request-time");
-const router = express.Router();
+const nodemailer = require("nodemailer");  // Add this
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(requestTime);
+app.use(express.urlencoded({ extended: false }));
+app.use(express.json());
 
-// Serve static files from the "static" directory in the "backend" folder
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
+
 app.use(express.static(path.join(__dirname, "static")));
 
-const rootRoutes = require("./routes/root");
-app.use("/", rootRoutes);
-
-// Default route
-// Default route
-app.get("/", (request, response) => {
-  response.render('home');
+app.get("/", (req, res) => {
+  res.render("home");
 });
 
-// Route for /contact
-app.set('views', path.join(__dirname, 'views'));
-app.set('view engine', 'ejs');
+app.post("/send-message", async (req, res) => {
+  const { name, email, message } = req.body;
 
+  // Create transporter object using SMTP (example with Gmail)
+  let transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: "your.email@gmail.com",        // replace with your Gmail
+      pass: "your_app_password",            // replace with your app password
+    },
+  });
 
+  let mailOptions = {
+    from: `"${name}" <${email}>`,
+    to: "your.email@gmail.com",              // where you want to receive messages
+    subject: "New Contact Form Message",
+    text: message,
+  };
 
-
-// Middleware to handle 404 errors
-app.use((request, response, next) => {
-    next(createError(404));
-});
-
-// Start the server
-app.listen(PORT, () => {
-    console.log(`Server started on port ${PORT}`);
-});
-
-if (process.env.NODE_ENV === "development") {
-    const liveReloadServer = livereload.createServer();
-   liveReloadServer.watch(path.join(__dirname, "static"));
-  liveReloadServer.server.once("connection", () => {
-      setTimeout(() => {
-        liveReloadServer.refresh("/");
-      }, 100);
-    });
+  try {
+    await transporter.sendMail(mailOptions);
+    res.render("confirmation", { message: "Email sent successfully!" });
+  } catch (error) {
+    console.error(error);
+    res.render("error", { message: "Failed to send email", error });
   }
+});
+
+app.use((req, res, next) => {
+  next(createError(404));
+});
+
+app.use((err, req, res, next) => {
+  res.status(err.status || 500);
+  res.render("error", {
+    message: err.message,
+    error: process.env.NODE_ENV === "development" ? err : {},
+  });
+});
+
+app.listen(PORT, () => {
+  console.log(`Server started on port ${PORT}`);
+});
